@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- CSS style classes -->
+<Rootnode>
+    <Background Colour="0x000000FF"></Background>
+    <Size Width="100%" Height="100%"></Size>
+</Rootnode>
+<Sidebar_left>
+    <Background Colour="0x333333FF"></Background>
+    <Offsets Top="7%" Left="00%" ></Offsets>
+    <Size Width="20%" Height="93%"></Size>
+</Sidebar_left>
+<Sidebar_right>
+    <Background Colour="0x333333FF"></Background>
+    <Offsets Top="7%" Left="80%" ></Offsets>
+    <Size Width="20%" Height="93%"></Size>
+</Sidebar_right>

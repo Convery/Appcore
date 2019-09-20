@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- HTML style markup -->
+<Root Class="Rootnode">
+    <Sidebar_left Class="Sidebar_left">
+    </Sidebar_left>
+    <Sidebar_right Class="Sidebar_right">
+    </Sidebar_right>
+</Root>
