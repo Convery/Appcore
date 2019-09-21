@@ -1,21 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 
 <!-- For Windows, the colour format is BGRA -->
+<Class Name="Container">
+    <Size Width="100%" Height="100%"></Size>
+</Class>
 <Class Name="Content">
     <Background Colour="0xE3E5E8FF"></Background>
-    <Size Width="100%" Height="100%"></Size>
+    <Offset Top="5%" Left="20%"></Offset>
+    <Size Width="75%" Height="95%"></Size>
 </Class>
 <Class Name="Toolbar">
     <Background Colour="0x444444FF"></Background>
     <Size Width="100%" Height="5%"></Size>
 </Class>
-<Class Name="Toolbar_nav">
-    <Background Colour="0x888888FF"></Background>
-    <Size Width="20%" Height="100%"></Size>
-</Class>
 <Class Name="Toolbar_search">
     <Background Colour="0x000000FF"></Background>
-    <Offset Left="20%"></Offset>
     <Size Width="30%" Height="100%"></Size>
 </Class>
 <Class Name="Toolbar_systembuttons">
@@ -23,7 +22,6 @@
     <Offset Top="-5%" Left="91.5%"></Offset>
     <Size Width="8%" Height="70%"></Size>
 </Class>
-
 <Class Name="Sidebar_container">
     <Background Border="0x222222FF"></Background>
     <Offset Top="5%" Left="80%" ></Offset>
@@ -39,36 +37,34 @@
     <Offset Top="30%" Left="75%" ></Offset>
     <Size Width="25%" Height="70%"></Size>
 </Class>
-
 <Class Name="Gamebar_container">
-    <Background Colour="0x333333FF"></Background>
+    <Background Colour="0x00000044"></Background>
     <Offset Top="5%" Left="0%" ></Offset>
     <Size Width="20%" Height="95%"></Size>
 </Class>
 <Class Name="Gamebar_library">
-    <Background Colour="0x11111155"></Background>
     <Size Width="100%" Height="88%"></Size>
 </Class>
 <Class Name="Gamebar_management">
-    <Background Colour="0x0000FF00"></Background>
+    <Background Border="0x0000FF00"></Background>
     <Offset Top="88%" Left="0%" ></Offset>
     <Size Width="100%" Height="12%"></Size>
 </Class>
 <Class Name="Gamebar_management_addgame">
-    <Background Colour="0xFF000055"></Background>
+    <Background Border="0xFF000055"></Background>
     <Size Width="100%" Height="50%"></Size>
 </Class>
 <Class Name="Gamebar_management_download">
-    <Background Colour="0x00FF0055"></Background>
+    <Background Border="0x00FF0055"></Background>
     <Offset Top="50%" Left="0%" ></Offset>
     <Size Width="100%" Height="50%"></Size>
 </Class>
 
 <!-- Elements in render-order -->
-<Node Class="Content">
+<Node>
+    <Node Class="Content"></Node>
     <Node Class="Toolbar">
         <onState>Toolbar::onState</onState>
-        <Node Class="Toolbar_nav"></Node>
         <Node Class="Toolbar_search"></Node>
         <Node Class="Toolbar_systembuttons"></Node>
     </Node>
