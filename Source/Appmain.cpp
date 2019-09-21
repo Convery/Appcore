@@ -4,52 +4,22 @@
     License: MIT
 */
 
-#define WIN32_LEAN_AND_MEAN
-#pragma comment(lib, "gdiplus")
-
-// Platform specific.
-#include <ObjIdl.h>
-#include <gdiplus.h>
-#include <windows.h>
-#include <windowsx.h>
-#undef min
-#undef max
-
-// Third party.
-#include <pugixml.hpp>
-
-// Portable.
-#include <unordered_map>
-#include <functional>
-#include <cstdint>
-#include <chrono>
-#include <string>
-#include <memory>
-#include <thread>
-#include <array>
-
-// First party.
-#include <Utilities/FNV1Hash.hpp>
+#include <Stdinclude.hpp>
 
 namespace Global
 {
     bool shouldReload{ false };
     bool isDirty{ true };
     uint32_t Errorno;
+
+    // TODO(tcn): Move this somewhere.
+    std::unordered_map<uint32_t, Callback_t> Callbacks;
 }
-// Vertex and sub-pixel coordinate-system, could probably go down to half-precision floats.
-using vec4_t = struct { union { struct { float x, y, z, w; }; struct { float x0, y0, x1, y1; }; float Raw[4]; }; };
-using vec3_t = struct { union { struct { float x, y, z; }; float Raw[3]; }; };
-using vec2_t = struct { union { struct { float x, y; }; float Raw[2]; }; };
 
-// -||-
-using point4_t = struct { union { struct { int16_t x, y, z, w; }; struct { int16_t x0, y0, x1, y1; }; int16_t Raw[4]; }; };
-using point3_t = struct { union { struct { int16_t x, y, z; }; int16_t Raw[3]; }; };
-using point2_t = struct { union { struct { int16_t x, y; }; int16_t Raw[2]; }; };
-
-// In-flight representation, will be optimized out (probably), should still be aligned to 16 bytes.
-using rgba_t = struct { union { struct { float R, G, B, A; }; float Raw[4]; }; };
-using rgb_t = struct { union { struct { float R, G, B; }; float Raw[3]; }; };
+namespace Attributes
+{
+    struct Background { uint32_t Colour, Border; std::string Image; };
+}
 
 // Create a centred window chroma-keyed on 0xFFFFFF.
 void *Createwindow(point2_t Windowsize, RECT Desktop)
@@ -71,7 +41,7 @@ void *Createwindow(point2_t Windowsize, RECT Desktop)
     const auto Desktopcentery = Desktop.top + Desktopheight * 0.5f;
 
     // HACK(tcn): We create the window with a size of 0 to prevent rendering of the first frame (black).
-    auto Windowhandle = CreateWindowExA(WS_EX_LAYERED | WS_EX_APPWINDOW, "Desktop_cpp", NULL, WS_POPUP, 0, 0, 0, 0, NULL, NULL, Windowclass.hInstance, NULL);
+    auto Windowhandle = CreateWindowExA(WS_EX_LAYERED | WS_EX_APPWINDOW | WS_EX_TOPMOST, "Desktop_cpp", NULL, WS_POPUP, 0, 0, 0, 0, NULL, NULL, Windowclass.hInstance, NULL);
     if(Windowhandle == 0) return nullptr;
 
     // Use a pixel-value of {0xFF, 0xFF, 0xFF} to mean transparent, because we should not use pure white anyway.
@@ -79,178 +49,12 @@ void *Createwindow(point2_t Windowsize, RECT Desktop)
 
     // Resize the window to the requested size.
     SetWindowPos(Windowhandle, NULL,
-                 static_cast<int>(std::round(Desktopcenterx - Windowsize.x * 0.5)),
-                 static_cast<int>(std::round(Desktopcentery - Windowsize.y * 0.5)),
+                 std::lround(Desktopcenterx - Windowsize.x * 0.5),
+                 std::lround(Desktopcentery - Windowsize.y * 0.5),
                  Windowsize.x, Windowsize.y,
                  SWP_NOSENDCHANGING);
     ShowWindow(Windowhandle, SW_SHOWNORMAL);
     return Windowhandle;
-}
-
-union ChildID_t { uint32_t Raw; uint8_t ID[4]; };
-namespace Attributes
-{
-    struct Offsets_t { float Top, Left; };
-    struct Size_t { float Width, Height; };
-    struct Background_t { uint32_t Colour; std::string Image; };
-}
-union Attribute_t
-{
-    Attributes::Background_t *Background;
-    Attributes::Offsets_t *Offsets;
-    Attributes::Size_t *Size;
-    void *Raw;
-};
-struct Element_t
-{
-    vec4_t Area{};          // Recalculated on style-change.
-    uint32_t ClassID{};     // Assigned by blueprint.
-    ChildID_t Children{};   // -||-
-};
-
-using Class_t = std::unordered_map<uint32_t, Attribute_t>;
-std::unordered_map<uint32_t, Class_t> Classes;
-
-template<typename T, size_t Maxsize>
-struct Array
-{
-    std::array<T, Maxsize> Data{}; size_t Size{};
-    T &operator[](size_t i) { return Data[i]; }
-    std::pair<size_t, T *> add(T v = {})
-    {
-        if(Size == Maxsize) return {};
-        auto k = &Data[Size]; *k = v;
-        return { Size++, k };
-    }
-};
-
-// Initialize an array of elements.
-Array<Element_t, UINT8_MAX> Createnodes(std::string_view Filepath)
-{
-    Array<Element_t, UINT8_MAX> Result{};
-    pugi::xml_document Document;
-
-    // Parse the XML document.
-    if(!Document.load_file(Filepath.data()))
-    {
-        return Result;
-    }
-
-    // Build the tree recursively.
-    std::function<uint8_t(const pugi::xml_node)> Lambda = [&](const pugi::xml_node Node) -> uint8_t
-    {
-        auto This = Result.add();
-        This.second->ClassID = Hash::FNV1a_32(Node.attribute("Class").as_string());
-
-        for(const auto Item : Node.children())
-        {
-            if(This.second->Children.ID[0] == 0) { This.second->Children.ID[0] = Lambda(Item); continue; }
-            if(This.second->Children.ID[1] == 0) { This.second->Children.ID[1] = Lambda(Item); continue; }
-            if(This.second->Children.ID[2] == 0) { This.second->Children.ID[2] = Lambda(Item); continue; }
-            if(This.second->Children.ID[3] == 0) { This.second->Children.ID[3] = Lambda(Item); continue; }
-        }
-
-        return This.first;
-    };
-    Lambda(Document.first_child());
-
-    return Result;
-}
-
-// Initialize / update the classes.
-void Processclasses(std::string_view Filepath, Array<Element_t, UINT8_MAX> &Nodetree, vec4_t Boundingbox)
-{
-    pugi::xml_document Document;
-
-    // Parse the XML document.
-    if(!Document.load_file(Filepath.data()))
-    {
-        return;
-    }
-
-    // Classes only have a single level.
-    for(const auto &Class : Document.children())
-    {
-        auto pClass = &Classes[Hash::FNV1a_32(Class.name())];
-        const auto Background = Class.child("Background");
-        const auto Offsets = Class.child("Offsets");
-        const auto Size = Class.child("Size");
-
-        if(!Background.empty())
-        {
-            auto This = &(*pClass)[Hash::FNV1a_32("Background")];
-            if(!This->Raw) This->Raw = new Attributes::Background_t();
-
-            auto Colour = Background.attribute("Colour");
-            auto Image = Background.attribute("Image");
-
-            if(!Colour.empty()) This->Background->Colour = _byteswap_ulong(Colour.as_uint());
-            if(!Image.empty()) This->Background->Image = Image.as_string();
-        }
-
-        if(!Offsets.empty())
-        {
-            auto This = &(*pClass)[Hash::FNV1a_32("Offsets")];
-            if(!This->Raw) This->Raw = new Attributes::Offsets_t();
-
-            auto Left = Offsets.attribute("Left");
-            auto Top = Offsets.attribute("Top");
-
-            if(!Left.empty()) This->Offsets->Left = Left.as_float() / 100;
-            if(!Top.empty()) This->Offsets->Top = Top.as_float() / 100;
-        }
-
-        if(!Size.empty())
-        {
-            auto This = &(*pClass)[Hash::FNV1a_32("Size")];
-            if(!This->Raw) This->Raw = new Attributes::Size_t();
-
-            auto Height = Size.attribute("Height");
-            auto Width = Size.attribute("Width");
-
-            if(!Height.empty()) This->Size->Height = Height.as_float() / 100;
-            if(!Width.empty()) This->Size->Width = Width.as_float() / 100;
-        }
-    }
-
-    // Update all items.
-    std::function<void(uint8_t, vec4_t)> Lambda = [&](uint8_t Piviot, vec4_t Box)
-    {
-        auto This = &Nodetree[Piviot];
-
-        if(This->ClassID)
-        {
-            This->Area = {};
-            const auto Width = Box.x1 - Box.x0;
-            const auto Height = Box.y1 - Box.y0;
-            const auto Attributes = Classes[This->ClassID];
-            const auto Size = Attributes.find(Hash::FNV1a_32("Size"));
-            const auto Offsets = Attributes.find(Hash::FNV1a_32("Offsets"));
-
-            if(Size != Attributes.end())
-            {
-                This->Area.x1 = Width * Size->second.Size->Width;
-                This->Area.y1 = Height * Size->second.Size->Height;
-            }
-
-            if(Offsets != Attributes.end())
-            {
-                This->Area.x0 += Box.x0 + Width * Offsets->second.Offsets->Left;
-                This->Area.x1 += Box.x0 + Width * Offsets->second.Offsets->Left;
-                This->Area.y0 += Box.y0 + Height * Offsets->second.Offsets->Top;
-                This->Area.y1 += Box.y0 + Height * Offsets->second.Offsets->Top;
-            }
-        }
-
-        if(This->Children.Raw)
-        {
-            if(This->Children.ID[0]) Lambda(This->Children.ID[0], This->Area);
-            if(This->Children.ID[1]) Lambda(This->Children.ID[1], This->Area);
-            if(This->Children.ID[2]) Lambda(This->Children.ID[2], This->Area);
-            if(This->Children.ID[3]) Lambda(This->Children.ID[3], This->Area);
-        }
-    };
-    Lambda(0, Boundingbox);
 }
 
 // Get input and other such interrupts.
@@ -258,7 +62,7 @@ inline bool Hittest(point2_t Point, vec4_t Area)
 {
     return Point.x >= Area.x0 && Point.x <= Area.x1 && Point.y >= Area.y0 && Point.y <= Area.y1;
 }
-void Processmessages(const void *Windowhandle, Array<Element_t, UINT8_MAX> &Nodetree)
+void Processmessages(const void *Windowhandle, Array<Element_t, UINT8_MAX> &Nodetree, Array<Callback_t, UINT8_MAX> &Callbacks)
 {
     MSG Event{};
 
@@ -270,26 +74,56 @@ void Processmessages(const void *Windowhandle, Array<Element_t, UINT8_MAX> &Node
         {
             // Coordinates relative to the window.
             const point2_t Mouse{ GET_X_LPARAM(Event.lParam), GET_Y_LPARAM(Event.lParam) };
-            Array<uint8_t, UINT8_MAX> Hits;
+            Array<uint8_t, UINT8_MAX> Hit, Miss;
 
             // Recursive check of the nodes following the root.
-            std::function<void(uint8_t)> Lambda = [&](uint8_t Piviot) -> void
+            std::function<void(uint8_t, bool)> Lambda = [&](uint8_t Piviot, bool Missed) -> void
             {
                 const auto &This = Nodetree[Piviot];
-                if(!Hittest(Mouse, This.Area)) return;
+                if(!Missed) Missed = !Hittest(Mouse, This.Area);
 
-                Hits.add(Piviot);
-                if(This.Children.Raw)
-                {
-                    if(This.Children.ID[0]) Lambda(This.Children.ID[0]);
-                    if(This.Children.ID[1]) Lambda(This.Children.ID[1]);
-                    if(This.Children.ID[2]) Lambda(This.Children.ID[2]);
-                    if(This.Children.ID[3]) Lambda(This.Children.ID[3]);
-                }
+                if(This.Child_1) Lambda(This.Child_1, Missed);
+                if(This.Child_2) Lambda(This.Child_2, Missed);
+                if(This.Child_3) Lambda(This.Child_3, Missed);
+                if(This.Child_4) Lambda(This.Child_4, Missed);
+
+                if(Missed) Miss.add(Piviot);
+                else Hit.add(Piviot);
             };
-            Lambda(0);
+            Lambda(0, false);
 
-            // TODO(tcn): Check if a node wants this.
+            // Clear the state of missed elements.
+            for(size_t i = 0; i < Miss.Size; ++i)
+            {
+                auto &Node = Nodetree[Miss[i]];
+
+                if(Node.State.isHoveredover)
+                {
+                    auto Copy = Node.State;
+                    Copy.isHoveredover = false;
+                    Copy.isLeftclicked &= Event.message == WM_LBUTTONUP;
+                    Copy.isRightclicked &= Event.message == WM_RBUTTONUP;
+                    Copy.isMiddleclicked &= Event.message == WM_MBUTTONUP;
+                    if(Node.onState) Callbacks[Node.onState](Node, &Copy);
+
+                    Node.State = Copy;
+                }
+            }
+
+            // Notify the set elements.
+            for(size_t i = 0; i < Hit.Size; ++i)
+            {
+                auto &Node = Nodetree[Hit[i]];
+                auto Copy = Node.State;
+
+                Copy.isHoveredover = true;
+                Copy.isLeftclicked |= Event.message == WM_LBUTTONDOWN;
+                Copy.isRightclicked |= Event.message == WM_RBUTTONDOWN;
+                Copy.isMiddleclicked |= Event.message == WM_MBUTTONDOWN;
+                if(Node.onState) Callbacks[Node.onState](Node, &Copy);
+
+                Node.State = Copy;
+            }
 
             continue;
         }
@@ -309,6 +143,121 @@ void Processmessages(const void *Windowhandle, Array<Element_t, UINT8_MAX> &Node
     }
 }
 
+// Parse the markup into arrays.
+bool Parseblueprint(vec4_t Boundingbox, std::string_view Filepath, Array<Element_t, UINT8_MAX> *Nodes,
+                    Array<Class_t, UINT8_MAX> *Properties, Array<Callback_t, UINT8_MAX> *Callbacks)
+{
+    // Parse the XML document.
+    pugi::xml_document Document;
+    if(!Document.load_file(Filepath.data())) return false;
+
+    // Ensure that the arrays are 'empty'.
+    Nodes->Size = Properties->Size = 0;
+    Callbacks->Size = 1;
+
+    // Temporary storage for hashes.
+    std::unordered_map<uint32_t, uint8_t> Classindex{};
+
+    // Initialize the class system.
+    for(const auto &Class : Document.children("Class"))
+    {
+        auto [Index, pClass] = Properties->add();
+        Classindex[Hash::FNV1a_32(Class.attribute("Name").as_string())] = Index;
+
+        const auto Size = Class.child("Size");
+        pClass->insert_or_assign(Hash::FNV1a_32("Size"), vec2_t{
+            Size.attribute("Width").as_float() / 100,
+            Size.attribute("Height").as_float() / 100 });
+
+        const auto Offset = Class.child("Offset");
+        pClass->insert_or_assign(Hash::FNV1a_32("Offset"), vec2_t{
+            Offset.attribute("Left").as_float() / 100,
+            Offset.attribute("Top").as_float() / 100 });
+
+        const auto Background = Class.child("Background");
+        pClass->insert_or_assign(Hash::FNV1a_32("Background"), Attributes::Background{
+                                     _byteswap_ulong(Background.attribute("Colour").as_uint()),
+                                     _byteswap_ulong(Background.attribute("Border").as_uint()),
+                                     Background.attribute("Image").as_string() });
+    }
+
+    // Build the node-tree recursively.
+    std::function<uint8_t(const pugi::xml_node &)> Buildnode = [&](const pugi::xml_node &Node) -> uint8_t
+    {
+        auto [Index, Entry] = Nodes->add();
+        Entry->StyleID = Classindex[Hash::FNV1a_32(Node.attribute("Class").as_string())];
+
+        const auto Register = [&](auto Iterator) -> uint8_t
+        {
+            if(Iterator == Global::Callbacks.end()) return 0;
+
+            // Skip the dummy function.
+            for(uint32_t i = 1; i < Callbacks->Size; ++i)
+            {
+                // HACK(tcn): Apparently std::function::target() does not like lambdas..
+                if(0 == std::memcmp(&(*Callbacks)[i], &Iterator->second, sizeof(Callback_t)))
+                {
+                    return i & 0xFF;
+                }
+            }
+
+            auto [i, _] = Callbacks->add(Iterator->second);
+            return i & 0xFF;
+        };
+        Entry->onFrame = Register(Global::Callbacks.find(Hash::FNV1a_32(Node.child_value("onFrame"))));
+        Entry->onState = Register(Global::Callbacks.find(Hash::FNV1a_32(Node.child_value("onState"))));
+
+        for(const auto &Child : Node.children("Node"))
+        {
+            if(!Entry->Child_1) { Entry->Child_1 = Buildnode(Child); continue; }
+            if(!Entry->Child_2) { Entry->Child_2 = Buildnode(Child); continue; }
+            if(!Entry->Child_3) { Entry->Child_3 = Buildnode(Child); continue; }
+            if(!Entry->Child_4) { Entry->Child_4 = Buildnode(Child); continue; }
+
+            assert(false);
+        }
+
+        return Index;
+    };
+    for(const auto &Node : Document.children("Node"))
+    {
+        Buildnode(Node);
+    }
+
+    // Calculate the dimensions of the items.
+    std::function<void(uint8_t, vec4_t)> Initialize = [&](uint8_t Piviot, vec4_t Box)
+    {
+        auto This = &(*Nodes)[Piviot];
+        const auto Width = Box.x1 - Box.x0;
+        const auto Height = Box.y1 - Box.y0;
+        const auto Attributes = (*Properties)[This->StyleID];
+        const auto Size = Attributes.find(Hash::FNV1a_32("Size"));
+        const auto Offset = Attributes.find(Hash::FNV1a_32("Offset"));
+
+        This->Area = {};
+        if(Size != Attributes.end())
+        {
+            This->Area.x1 = Width * std::any_cast<vec2_t>(Size->second).x;
+            This->Area.y1 = Height * std::any_cast<vec2_t>(Size->second).y;
+        }
+        if(Offset != Attributes.end())
+        {
+            This->Area.x0 += Box.x0 + Width * std::any_cast<vec2_t>(Offset->second).x;
+            This->Area.x1 += Box.x0 + Width * std::any_cast<vec2_t>(Offset->second).x;
+            This->Area.y0 += Box.y0 + Height * std::any_cast<vec2_t>(Offset->second).y;
+            This->Area.y1 += Box.y0 + Height * std::any_cast<vec2_t>(Offset->second).y;
+        }
+
+        if(This->Child_1) Initialize(This->Child_1, This->Area);
+        if(This->Child_2) Initialize(This->Child_2, This->Area);
+        if(This->Child_3) Initialize(This->Child_3, This->Area);
+        if(This->Child_4) Initialize(This->Child_4, This->Area);
+    };
+    Initialize(0, Boundingbox);
+
+    return true;
+}
+
 // Entrypoint.
 int __cdecl main(int, char **)
 {
@@ -326,27 +275,47 @@ int __cdecl main(int, char **)
     Gdiplus::GdiplusStartupInput Input{}; ULONG_PTR T;
     Gdiplus::GdiplusStartup(&T, &Input, nullptr);
 
-    // Parse the markup.
-    auto Nodetree = Createnodes("../Assets/Mainwindow.xml");
-    Processclasses("../Assets/Style.xml", Nodetree, { 0.0f, 0.0f,
-                   static_cast<float>(Windowsize.x),
-                   static_cast<float>(Windowsize.y)
-                   });
+    // TODO(tcn): Move this somewhere..
+    //bool Shouldmove
+    Global::Callbacks[Hash::FNV1a_32("Toolbar::onState")] = [&](Element_t &This, const void *Param) -> bool
+    {
+        auto Newstate = static_cast<const Elementstate_t *>(Param);
 
+        if(Newstate->isLeftclicked)
+        {
+            POINT Point;
+            ReleaseCapture();
+            GetCursorPos(&Point);
+            SendMessageA((HWND)Windowhandle, WM_NCLBUTTONDOWN, HTCAPTION, MAKEWPARAM(Point.x, Point.y));
+        }
+
+        return Newstate->isLeftclicked;
+    };
+
+    // Parse our markup.
+    Array<Class_t, UINT8_MAX> Classes;
+    Array<Element_t, UINT8_MAX> Nodetree;
+    Array<Callback_t, UINT8_MAX> Callbacks;
+    Parseblueprint({ 0.0f, 0.0f, float(Windowsize.x), float(Windowsize.y) },
+                   "../Assets/Mainwindow.xml", &Nodetree, &Classes, &Callbacks);
+
+
+    // Developer only.
+    #if !defined(NDEBUG)
     std::thread([]()
     {
-        FILETIME Lastresult{};
+        FILETIME Blueprint{}, Style{};
 
         while(true)
         {
-            if(auto Filehandle = CreateFileA("../Assets/Style.xml", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL))
+            if(auto Filehandle = CreateFileA("../Assets/Mainwindow.xml", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL))
             {
                 FILETIME Localresult{};
                 GetFileTime(Filehandle, NULL, NULL, &Localresult);
 
-                if(*(uint64_t *)&Localresult != *(uint64_t *)&Lastresult)
+                if(*(uint64_t *)&Localresult != *(uint64_t *)&Blueprint)
                 {
-                    Lastresult = Localresult;
+                    Blueprint = Localresult;
                     Global::shouldReload = true;
                 }
 
@@ -355,8 +324,8 @@ int __cdecl main(int, char **)
 
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-
     }).detach();
+    #endif
 
     // Main loop.
     while(true)
@@ -366,7 +335,15 @@ int __cdecl main(int, char **)
         const auto Thisframe{ std::chrono::high_resolution_clock::now() };
 
         // Process window-messages.
-        Processmessages(Windowhandle, Nodetree);
+        Processmessages(Windowhandle, Nodetree, Callbacks);
+
+        // And update the state as needed.
+        const auto Deltatime = std::chrono::duration<float>(Thisframe - Lastframe).count();
+        for(size_t i = 0; i < Nodetree.Size; ++i)
+        {
+            auto &Node = Nodetree[i];
+            if(Node.onFrame) Callbacks[Node.onFrame](Node, (void *)&Deltatime);
+        }
 
         // Render the previous frame.
         if(Global::isDirty)
@@ -387,15 +364,41 @@ int __cdecl main(int, char **)
             auto Drawingcontext = std::make_unique<Gdiplus::Graphics>(Memorycontext);
             Drawingcontext->Clear(Gdiplus::Color::White);
 
-            // DO render here
+            // Render each of the nodes to the window.
             for(size_t i = 0; i < Nodetree.Size; ++i)
             {
+                // Background attributes.
+                const auto Background = std::any_cast<Attributes::Background>
+                    (Classes[Nodetree[i].StyleID][Hash::FNV1a_32("Background")]);
+
                 // Not allowed to be initialized without a colour.. Silly..
                 static auto Brush{ new Gdiplus::SolidBrush(Gdiplus::Color()) };
-                const auto &Node = Nodetree[i];
-                Brush->SetColor(Classes[Node.ClassID][Hash::FNV1a_32("Background")].Background->Colour);
+                static auto Pen{ new Gdiplus::Pen(Gdiplus::Color()) };
 
-                Drawingcontext->FillRectangle(Brush, Node.Area.x0, Node.Area.y0, Node.Area.x1 - Node.Area.x0, Node.Area.y1 - Node.Area.y0);
+                // Render order: Solid, Overlay, Outline.
+                if(Background.Colour)
+                {
+                    Brush->SetColor(Background.Colour);
+                    Drawingcontext->FillRectangle(Brush,
+                                                  Nodetree[i].Area.x0,
+                                                  Nodetree[i].Area.y0,
+                                                  Nodetree[i].Area.x1 - Nodetree[i].Area.x0,
+                                                  Nodetree[i].Area.y1 - Nodetree[i].Area.y0);
+                }
+                if(!Background.Image.empty())
+                {
+                    // TODO(tcn): Need a buffer system..
+                }
+                if(Background.Border)
+                {
+                    Pen->SetColor(Background.Border);
+
+                    // HACK(tcn): Drawingcontext->DrawLines will allocate a separate buffer, so we draw each line directly.
+                    Drawingcontext->DrawLine(Pen, Nodetree[i].Area.x0, Nodetree[i].Area.y0, Nodetree[i].Area.x1 - 1, Nodetree[i].Area.y0);
+                    Drawingcontext->DrawLine(Pen, Nodetree[i].Area.x1 - 1, Nodetree[i].Area.y0, Nodetree[i].Area.x1 - 1, Nodetree[i].Area.y1 - 1);
+                    Drawingcontext->DrawLine(Pen, Nodetree[i].Area.x1 - 1, Nodetree[i].Area.y1 - 1, Nodetree[i].Area.x0, Nodetree[i].Area.y1 - 1);
+                    Drawingcontext->DrawLine(Pen, Nodetree[i].Area.x0, Nodetree[i].Area.y1 - 1, Nodetree[i].Area.x0, Nodetree[i].Area.y0);
+                }
             }
 
             // Present to the window.
@@ -419,11 +422,9 @@ int __cdecl main(int, char **)
         // Developer, reloading.
         if(Global::shouldReload)
         {
-            Processclasses("../Assets/Style.xml", Nodetree, { 0.0f, 0.0f,
-                   static_cast<float>(Windowsize.x),
-                   static_cast<float>(Windowsize.y)
-                   });
-
+            Parseblueprint({ 0.0f, 0.0f, float(Windowsize.x), float(Windowsize.y) },
+                           "../Assets/Mainwindow.xml", &Nodetree, &Classes, &Callbacks);
+            Global::shouldReload = false;
             Global::isDirty = true;
         }
 
@@ -436,4 +437,3 @@ int __cdecl main(int, char **)
 
     return 0;
 }
-

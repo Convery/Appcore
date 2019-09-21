@@ -1,13 +1,86 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
-<Root Class="Rootnode">
-    <Sidebar_left Class="Sidebar_left">
-    </Sidebar_left>
-    <Sidebar_right Class="Sidebar_right">
-    </Sidebar_right>
-    <Toolbar Class="Toolbar">
-        <Searchbar Class="Searchbar"></Searchbar>
-        <Title Class="Title"></Title>
-        <Window_ctrl Class="Window_ctrl">
-        </Window_ctrl>
-    </Toolbar>
-</Root>
+
+<!-- For Windows, the colour format is BGRA -->
+<Class Name="Content">
+    <Background Colour="0xE3E5E8FF"></Background>
+    <Size Width="100%" Height="100%"></Size>
+</Class>
+<Class Name="Toolbar">
+    <Background Colour="0x444444FF"></Background>
+    <Size Width="100%" Height="5%"></Size>
+</Class>
+<Class Name="Toolbar_nav">
+    <Background Colour="0x888888FF"></Background>
+    <Size Width="20%" Height="100%"></Size>
+</Class>
+<Class Name="Toolbar_search">
+    <Background Colour="0x000000FF"></Background>
+    <Offset Left="20%"></Offset>
+    <Size Width="30%" Height="100%"></Size>
+</Class>
+<Class Name="Toolbar_systembuttons">
+    <Background Colour="0x0FF000FF"></Background>
+    <Offset Top="-5%" Left="91.5%"></Offset>
+    <Size Width="8%" Height="70%"></Size>
+</Class>
+
+<Class Name="Sidebar_container">
+    <Background Border="0x222222FF"></Background>
+    <Offset Top="5%" Left="80%" ></Offset>
+    <Size Width="20%" Height="95%"></Size>
+</Class>
+<Class Name="Sidebar_navigation">
+    <Background Colour="0x333333FF"></Background>
+    <Offset Top="0%" Left="75%" ></Offset>
+    <Size Width="25%" Height="30%"></Size>
+</Class>
+<Class Name="Sidebar_quickstart">
+    <Background Colour="0x555555FF"></Background>
+    <Offset Top="30%" Left="75%" ></Offset>
+    <Size Width="25%" Height="70%"></Size>
+</Class>
+
+<Class Name="Gamebar_container">
+    <Background Colour="0x333333FF"></Background>
+    <Offset Top="5%" Left="0%" ></Offset>
+    <Size Width="20%" Height="95%"></Size>
+</Class>
+<Class Name="Gamebar_library">
+    <Background Colour="0x11111155"></Background>
+    <Size Width="100%" Height="88%"></Size>
+</Class>
+<Class Name="Gamebar_management">
+    <Background Colour="0x0000FF00"></Background>
+    <Offset Top="88%" Left="0%" ></Offset>
+    <Size Width="100%" Height="12%"></Size>
+</Class>
+<Class Name="Gamebar_management_addgame">
+    <Background Colour="0xFF000055"></Background>
+    <Size Width="100%" Height="50%"></Size>
+</Class>
+<Class Name="Gamebar_management_download">
+    <Background Colour="0x00FF0055"></Background>
+    <Offset Top="50%" Left="0%" ></Offset>
+    <Size Width="100%" Height="50%"></Size>
+</Class>
+
+<!-- Elements in render-order -->
+<Node Class="Content">
+    <Node Class="Toolbar">
+        <onState>Toolbar::onState</onState>
+        <Node Class="Toolbar_nav"></Node>
+        <Node Class="Toolbar_search"></Node>
+        <Node Class="Toolbar_systembuttons"></Node>
+    </Node>
+    <Node Class="Gamebar_container">
+        <Node Class="Gamebar_library"></Node>
+        <Node Class="Gamebar_management">
+            <Node Class="Gamebar_management_addgame"></Node>
+            <Node Class="Gamebar_management_download"></Node>
+        </Node>
+    </Node>
+    <Node Class="Sidebar_container">
+        <Node Class="Sidebar_navigation"></Node>
+        <Node Class="Sidebar_quickstart"></Node>
+    </Node>
+</Node>

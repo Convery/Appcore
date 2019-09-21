@@ -53,7 +53,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     endif()
 
     # Platform dependencies.
-    set(PLATFORM_LIBS ws2_32)
+    set(PLATFORM_LIBS gdiplus)
 else()
     # Assume GNU-GCC/CLANG.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
