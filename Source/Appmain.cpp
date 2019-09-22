@@ -276,7 +276,6 @@ int __cdecl main(int, char **)
     Gdiplus::GdiplusStartup(&T, &Input, nullptr);
 
     // TODO(tcn): Move this somewhere..
-    //bool Shouldmove
     Global::Callbacks[Hash::FNV1a_32("Toolbar::onState")] = [&](Element_t &This, const void *Param) -> bool
     {
         auto Newstate = static_cast<const Elementstate_t *>(Param);
@@ -298,7 +297,6 @@ int __cdecl main(int, char **)
     Array<Callback_t, UINT8_MAX> Callbacks;
     Parseblueprint({ 0.0f, 0.0f, float(Windowsize.x), float(Windowsize.y) },
                    "../Assets/Mainwindow.xml", &Nodetree, &Classes, &Callbacks);
-
 
     // Developer only.
     #if !defined(NDEBUG)

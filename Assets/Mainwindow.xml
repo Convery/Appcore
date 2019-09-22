@@ -2,13 +2,87 @@
 
 <!-- For Windows, the colour format is BGRA -->
 <Class Name="Container">
+    <Background Colour="0xE3E5E8FF"></Background>
     <Size Width="100%" Height="100%"></Size>
 </Class>
 <Class Name="Content">
-    <Background Colour="0xE3E5E8FF"></Background>
-    <Offset Top="5%" Left="20%"></Offset>
-    <Size Width="75%" Height="95%"></Size>
+    <Background Border="0xE3E5E8FF"></Background>
+    <Size Width="100%" Height="93.05%"></Size>
+    <Offset Top="3%" Left="0%"></Offset>
 </Class>
+<Class Name="Overlay">
+    <Background Border="0x44444433"></Background>
+    <Size Width="100%" Height="100%"></Size>
+</Class>
+
+<!-- V2 -->
+<Class Name="Toolbar">
+
+    <Size Width="100%" Height="3%"></Size>
+</Class>
+<Class Name="Toolbar::Control">
+    <Size Width="7%" Height="100%"></Size>
+    <Offset Top="0%" Left="93%"></Offset>
+</Class>
+<Class Name="Toolbar::Control::Min">
+    <Background Border="0x11111155"></Background>
+    <Size Width="30%" Height="100%"></Size>
+    <Offset Top="0%" Left="0%"></Offset>
+</Class>
+<Class Name="Toolbar::Control::Max">
+    <Background Border="0x11111155"></Background>
+    <Size Width="30%" Height="100%"></Size>
+    <Offset Top="0%" Left="33%"></Offset>
+</Class>
+<Class Name="Toolbar::Control::Close">
+    <Background Border="0x11111155"></Background>
+    <Size Width="30%" Height="100%"></Size>
+    <Offset Top="0%" Left="66%"></Offset>
+</Class>
+<Class Name="Toolbar::Title">
+    <Background Colour="0x11111111"></Background>
+    <Size Width="30%" Height="100%"></Size>
+    <Offset Top="0%" Left="35%"></Offset>
+</Class>
+
+<Class Name="Bottombar">
+    <Background Colour="0x444444FF"></Background>
+    <Size Width="100%" Height="4%"></Size>
+    <Offset Top="96%" Left="0%"></Offset>
+</Class>
+<Class Name="Bottombar::Navbar">
+    <Size Width="35%" Height="100%"></Size>
+</Class>
+<Class Name="Bottombar::Navbar::Library">
+    <Background Colour="0xE3E5E8FF"></Background>
+    <Size Width="25%" Height="100%"></Size>
+    <Offset Top="0%" Left="0%"></Offset>
+</Class>
+<Class Name="Bottombar::Navbar::Plugins">
+    <Background Border="0x11111155"></Background>
+    <Size Width="25%" Height="100%"></Size>
+    <Offset Top="0%" Left="25%"></Offset>
+</Class>
+<Class Name="Bottombar::Navbar::Social">
+    <Background Border="0x11111155"></Background>
+    <Size Width="25%" Height="100%"></Size>
+    <Offset Top="0%" Left="50%"></Offset>
+</Class>
+<Class Name="Bottombar::Navbar::Config">
+    <Background Border="0x11111155"></Background>
+    <Size Width="25%" Height="100%"></Size>
+    <Offset Top="0%" Left="75%"></Offset>
+</Class>
+<Class Name="Bottombar::Download">
+    <Background Colour="0x11111111"></Background>
+    <Size Width="30%" Height="100%"></Size>
+    <Offset Top="0%" Left="35%"></Offset>
+</Class>
+
+
+
+
+<!--
 <Class Name="Toolbar">
     <Background Colour="0x444444FF"></Background>
     <Size Width="100%" Height="5%"></Size>
@@ -59,10 +133,36 @@
     <Offset Top="50%" Left="0%" ></Offset>
     <Size Width="100%" Height="50%"></Size>
 </Class>
+-->
 
 <!-- Elements in render-order -->
 <Node>
+
+    <Node Class="Toolbar">
+        <onState>Toolbar::onState</onState>
+        <Node Class="Toolbar::Title"></Node>
+        <Node Class="Toolbar::Control">
+            <Node Class="Toolbar::Control::Min"></Node>
+            <Node Class="Toolbar::Control::Max"></Node>
+            <Node Class="Toolbar::Control::Close"></Node>
+        </Node>
+    </Node>
+    <Node Class="Bottombar">
+        <Node Class="Bottombar::Navbar">
+            <Node Class="Bottombar::Navbar::Library"></Node>
+            <Node Class="Bottombar::Navbar::Plugins"></Node>
+            <Node Class="Bottombar::Navbar::Social"></Node>
+            <Node Class="Bottombar::Navbar::Config"></Node>
+        </Node>
+        <Node Class="Bottombar::Download"></Node>
+    </Node>
+
     <Node Class="Content"></Node>
+    <Node Class="Overlay"></Node>
+
+
+
+        <!--
     <Node Class="Toolbar">
         <onState>Toolbar::onState</onState>
         <Node Class="Toolbar_search"></Node>
@@ -79,4 +179,6 @@
         <Node Class="Sidebar_navigation"></Node>
         <Node Class="Sidebar_quickstart"></Node>
     </Node>
+
+-->
 </Node>
